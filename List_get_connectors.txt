@@ -1,4 +1,3 @@
 [
-"BI_Get_Items",
-"BI_Get_Sales"
+"BI_Creditors"
 ]

@@ -31,10 +31,12 @@ import threading
 
 with open('credentials.txt', 'rb') as file:
     file_data = json.load(file)
-    site_url = file_data["site_url"]
+    sharepoint_url = file_data["sharepoint_url"]
     client_id = file_data["client_id"]
     client_secret = file_data["client_secret"]
-    token = file_data["afas_token"]
+    afas_token = file_data["afas_token"]
+    afas_url = file_data["afas_url"]
+    target_url  =  file_data["target_url"]
 
 
 with open('List_get_connectors.txt', 'rb') as fp:
@@ -52,19 +54,18 @@ app_principal = {
 
 
 def send_to_sharepoint(logger, file_name):
-    context_auth = AuthenticationContext(url=site_url) 
-    context_auth.acquire_token_for_app(client_id=app_principal[ 'client_id' ], 
-    client_secret=app_principal[ 'client_secret' ]) 
+    context_auth = AuthenticationContext(url=sharepoint_url) 
+    context_auth.acquire_token_for_app(client_id=app_principal[ 'client_id' ], client_secret=app_principal[ 'client_secret' ]) 
 
-    ctx = ClientContext(site_url, context_auth)
-
+    ctx = ClientContext(sharepoint_url, context_auth)
 
 
-    target_url = "/sites/PROJ-PowerBiData/Gedeelde documenten/Power Bi"
+
+    #target_url = "/sites/PROJ-PowerBiData/Gedeelde documenten/Power Bi"
     target_folder = ctx.web.get_folder_by_server_relative_url(target_url)
     size_chunk = 10000000
 
-    local_path = f"C:/Development/Python/For Power BI/{file_name}.csv"
+    local_path = os.getcwd()+ "/{file_name}.csv"
     start_time = time.time()
 
     def print_upload_progress(offset):
@@ -88,17 +89,17 @@ def send_to_sharepoint(logger, file_name):
     logger.info('Finished, file_name = %s Elapsed time: %s', file_name, elapsed_time)
 
 
-def getRESTConnMetainfoEndpoint(omgeving, getconnector_naam):
-    return "{}/connectors/{}".format(str('https://83607.rest.afas.online/ProfitRestServices'), getconnector_naam)
+def getRESTConnMetainfoEndpoint(getconnector_naam):
+    return "{}/connectors/{}".format(str(afas_url), getconnector_naam)
 
 
 
 
 
 async def get_by_porshon(conector,skip_i, session):
-    params = dict(Authorization = "AfasToken " + token)
+    params = dict(Authorization = "AfasToken " + afas_token)
     getconnector = conector +f'?skip={skip_i*100000}&take=100000'
-    async with session.get(getRESTConnMetainfoEndpoint('83607', getconnector), headers=params) as response:
+    async with session.get(getRESTConnMetainfoEndpoint(getconnector), headers=params) as response:
         return {skip_i: await response.json()}
 
 
