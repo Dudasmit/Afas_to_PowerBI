@@ -1,4 +1,11 @@
 
+
+from office365.runtime.auth.authentication_context import AuthenticationContext
+from office365.sharepoint.client_context import ClientContext
+import os
+import time
+
+
 import time
 import json
 import asyncio
@@ -8,7 +15,7 @@ import csv
 
 import pyodbc
 import pandas as pd
-import upload_to_sharepoint
+
 
 import logging
 
@@ -16,6 +23,69 @@ logger = logging.getLogger(__name__)
 
 import threading
 
+
+
+
+
+
+
+with open('credentials.txt', 'rb') as file:
+    file_data = json.load(file)
+    site_url = file_data["site_url"]
+    client_id = file_data["client_id"]
+    client_secret = file_data["client_secret"]
+    token = file_data["afas_token"]
+
+
+with open('List_get_connectors.txt', 'rb') as fp:
+    list_get_conn = json.load(fp)
+
+
+app_principal = { 
+  'client_id' : client_id , 
+  'client_secret' : client_secret , 
+} 
+
+
+
+
+
+
+def send_to_sharepoint(logger, file_name):
+    context_auth = AuthenticationContext(url=site_url) 
+    context_auth.acquire_token_for_app(client_id=app_principal[ 'client_id' ], 
+    client_secret=app_principal[ 'client_secret' ]) 
+
+    ctx = ClientContext(site_url, context_auth)
+
+
+
+    target_url = "/sites/PROJ-PowerBiData/Gedeelde documenten/Power Bi"
+    target_folder = ctx.web.get_folder_by_server_relative_url(target_url)
+    size_chunk = 10000000
+
+    local_path = f"C:/Development/Python/For Power BI/{file_name}.csv"
+    start_time = time.time()
+
+    def print_upload_progress(offset):
+        file_size = os.path.getsize(local_path)
+        logger.info("Uploaded '{0}' bytes from '{1}'...[{2}%]".format(offset, file_size, round(offset / file_size * 100, 2)))
+
+        print("Uploaded '{0}' bytes from '{1}'...[{2}%]".format(offset, file_size, round(offset / file_size * 100, 2)))
+
+
+    with open(f"{file_name}.csv", 'rb') as f:
+        uploaded_file = target_folder.files.create_upload_session(f, size_chunk,
+                                                              print_upload_progress).execute_query()
+
+    #uploaded_file = target_folder.files.create_upload_session(local_path, size_chunk, print_upload_progress).execute_query()
+    print('File {0} has been uploaded successfully'.format(uploaded_file.serverRelativeUrl))
+    logger.info('File {0} has been uploaded successfully'.format(uploaded_file.serverRelativeUrl))
+    
+    fin_end_time = time.time()
+    elapsed_time = fin_end_time - start_time
+    print('Elapsed time: ', elapsed_time)
+    logger.info('Finished, file_name = %s Elapsed time: %s', file_name, elapsed_time)
 
 
 def getRESTConnMetainfoEndpoint(omgeving, getconnector_naam):
@@ -26,20 +96,15 @@ def getRESTConnMetainfoEndpoint(omgeving, getconnector_naam):
 
 
 async def get_by_porshon(conector,skip_i, session):
-    token = "PHRva2VuPjx2ZXJzaW9uPjE8L3ZlcnNpb24+PGRhdGE+NkE2NDMzQjU1Rjg5NDE5ODg1RjVERDkwRjdBODJEMjdDNUI4QTM5OUVFM0I0MjAyODQ3OEM5QkIyQUY4OEE4MzwvZGF0YT48L3Rva2VuPg=="
-    params = dict(Authorization = "AfasToken " + token)#'PHRva2VuPjx2ZXJzaW9uPjE8L3ZlcnNpb24+PGRhdGE+QjBCNTg1QjJBNDNBNDAzOEE2NDUyNEZFNzc4QTFFMjdDQTIzOUY3MTQ3NDQ5N0JGQzg0QTZEQjkxM0NEODMzMjwvZGF0YT48L3Rva2VuPg==')
+    params = dict(Authorization = "AfasToken " + token)
     getconnector = conector +f'?skip={skip_i*100000}&take=100000'
-    #print(getconnector)
     async with session.get(getRESTConnMetainfoEndpoint('83607', getconnector), headers=params) as response:
         return {skip_i: await response.json()}
 
 
 
 async def get_data_from_afas(conector,skip):
-    """
-    Параллельное скачивание с каждой ссылки
-    (собираем awitable запросы в список, потом параллельно собираем результат через asyncio.gather)
-    """
+  
     timeout = ClientTimeout(total=6000)
     async with aiohttp.ClientSession(timeout=timeout) as session:
         results = []
@@ -82,7 +147,6 @@ def get_afas_asyncio(logger,conector=None):
     start_time = time.time()
     
     skip = list(range(0, 20))
-    #print(skip)
     while True:
         if len(skip) == 0:
             break
@@ -97,7 +161,7 @@ def get_afas_asyncio(logger,conector=None):
                 #print(errorCode)
                 if len(errorCode)!=0:
                     skip.append(key)
-                    print(key)
+                    #print(key)
                     
                 else:
                     try:
@@ -110,22 +174,11 @@ def get_afas_asyncio(logger,conector=None):
     
     
     
-    #print(qure_respons)
     fin_end_time = time.time()
     elapsed_time = fin_end_time - start_time
     logger.info('Finished %s Elapsed time: %s', conector, elapsed_time)
     print('Elapsed time: ', elapsed_time)
 
-    #df = pd.DataFrame(qure_respons, columns=list(qure_respons[0].keys()))
-    #print(df)
-
-    #df.rename(columns ={'Bedrag_regelkorting__BV_': 'Bedrag_regelkorting_BV', 'ED_-_SOS_calculation': 'ED_SOS_calculation'}, inplace=True)
-
-
-
-    #print(qure_respons[0].keys())
-    #with open("names.txt", "w") as fp:
-    #    json.dump(qure_respons, fp)
     try:
         with open(conector +'.csv',  'w', encoding = 'utf=8',  newline='') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames = list(qure_respons[0].keys())) 
@@ -134,6 +187,7 @@ def get_afas_asyncio(logger,conector=None):
             #df.to_csv(file)
     except:
         logger.exception('Data is not written to a file: %s',conector +'.csv')
+        raise IOError("")
 
 def send_to_sql():
 
@@ -167,7 +221,7 @@ def send_to_sql():
 
 
     n_list = n_list[0:100]    
-    print(list(n_list[0].keys()))
+    #print(list(n_list[0].keys()))
     
 
     del ListofCol[0]
@@ -178,8 +232,6 @@ def send_to_sql():
 
     df = df[ListofCol]
 
-    # Insert Dataframe into SQL Server:
-    #df.to_sql('api_bi_salesorderlineitems',cnxn,if_exists='replace')
     col_list = ", ".join(ListofCol)
     col_list = col_list.replace('-_', '')
 
@@ -188,13 +240,10 @@ def send_to_sql():
 
   
 
-    #print(mogrify)
-    #print(len(col_list.split(", ")))
     count = 0
 
     list_row = []
     for index, row in df.iterrows():
-        #print(f"INSERT INTO api_bi_salesorderlineitems ({col_list}) values({placeholders})")
         list_row.append(str(tuple(list(row))))
 
 
@@ -205,10 +254,6 @@ def send_to_sql():
   
     insert_st  = f"INSERT INTO api_bi_salesorderlineitems({col_list}) values{list_row}"
 
-    #print(", ".join(list_row))
-
-    #cursor.execute(f"INSERT INTO api_bi_salesorderlineitems({col_list}) values{",".join(list_row)}")
-    #cursor.execute(f"INSERT INTO api_bi_salesorderlineitems({col_list}) values{",".join(list_row[0])}")
 
     cnxn.commit()
     cursor.close()
@@ -217,6 +262,13 @@ def send_to_sql():
 
     print('Elapsed time: ', elapsed_time)
 
+
+
+def execute(logger,get,exeption_list):
+    
+
+        get_afas_asyncio(logger,get)
+        send_to_sharepoint(logger,get)
 
 
 
@@ -228,63 +280,41 @@ if __name__ == '__main__':
         datefmt="%Y-%m-%d %H:%M", level=logging.INFO)
     logger.info('Started *********************************')
 
-    list_get_conn = [
-    "BI_Marge_Grootboekrekeningen",
-    "BI_Marge_Financiele_mutaties",
-    "BI_Warehouse",
-    "BI_Verrekenprijs",
-    "BI_verkoopprijs",
-    "BI_verkoopfactuurregels",
-    "BI_Verkoopfactuur",
-    "BI_Stock_per_Warehouse",
-    "BI_SalesOrders",
-    "BI_SalesOrderLineItems_Changed_on_today",
-    "BI_SalesOrderLineItems",
-    "BI_Sales_teams",
-    "BI_PurchaseOrderLineItems",
-    "BI_Pakbonregels",
-    "BI_Mutaties_Last_Stock_transfer",
-    "BI_Items",
-    "BI_Item_group",
-    "BI_FbUnitBasicItem",
-    "BI_DeliveryNoteLineItems",
-    "BI_Debtors",
-    "BI_DebtorInvoicesLineItems",
-    "BI_Creditors",
-    "BI_Artikelcockpit",
-    #"BI_Article_image",
-    "BI_Administrations",
-    "BI_Mutaties_Afboekingen_Warehouse"]
-
+   
     get_list_test =["BI_Warehouse","BI_Article_image"]
 
-    get_list_hour =["BI_verkoopfactuurregels",
-    "BI_Stock_per_Warehouse",
-    
-    ]
     exeption_list = []
 
-    for get in get_list_hour:
+    for get in list_get_conn:
 
         try:
 
-            #daemon_thread = threading.Thread(target=get_afas_asyncio, args=(logger,get))
-            #daemon_thread.setDaemon(True)
-            #daemon_thread.start()
-
             get_afas_asyncio(logger,get)
-            upload_to_sharepoint.send_to_sharepoint(logger,get)
+            send_to_sharepoint(logger,get)
 
         except:
             logger.exception('Table execution error: %s', get)
 
             exeption_list.append(get)
 
+    logger.exception('Exeption List: %s', exeption_list)
+
+
+    for get in exeption_list:
+        try:
+
+
+            get_afas_asyncio(logger,get)
+            send_to_sharepoint(logger,get)
+
+        except:
+            logger.exception('Table execution error: %s', get)
+
+
+
+
+
     fin_end_time = time.time()
     elapsed_time = fin_end_time - start_time
     logger.info('Finished **************************, Elapsed time: %s', elapsed_time)
     print('Elapsed time: ', elapsed_time)
-
-
-
-    #send_to_sql()
