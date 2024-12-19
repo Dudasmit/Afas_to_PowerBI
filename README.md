@@ -8,7 +8,18 @@ Vervolgens kun je eenvoudig je Power BI-tools op het bestand aansluiten en rappo
 Nadat je de sharepoint accountgegevens en het pad waar je de bestanden wilt plaatsen hebt opgegeven, moet je de gegevens voor de verbinding met AFAS opgeven. 
 Wanneer de koppeling staat is het mogelijk om te beginnen met het bouwen van de gewenste rapportages en dashboards.
 
-### Het Python-project omzetten in een uitvoerbaar .EXE-bestand
+### De parameters invullen:
+
+{
+"client_id":"****",sharepoint
+"client_secret":"****", //sharepoint
+"sharepoint_url":"https://***.sharepoint.com/sites/{Jouw sectie}", //sharepoint
+"afas_token":"{Base64}", //afas
+"afas_url":"https://***.***.afas.online/ProfitRestServices", //afas
+"target_url":"/sites/{Jouw sectie}/Gedeelde documenten/General/{catalogus (indien nodig)}" //sharepoint
+} 
+
+#### Het Python-project omzetten in een uitvoerbaar .EXE-bestand
 https://plainenglish.io/blog/convert-a-python-project-to-an-executable-exe-file
 
 
