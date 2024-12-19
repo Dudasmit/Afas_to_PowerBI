@@ -65,7 +65,7 @@ def send_to_sharepoint(logger, file_name):
     target_folder = ctx.web.get_folder_by_server_relative_url(target_url)
     size_chunk = 10000000
 
-    local_path = os.getcwd()+ "/{file_name}.csv"
+    local_path = os.getcwd()+ f"/{file_name}.csv"
     start_time = time.time()
 
     def print_upload_progress(offset):
@@ -78,6 +78,7 @@ def send_to_sharepoint(logger, file_name):
     with open(f"{file_name}.csv", 'rb') as f:
         uploaded_file = target_folder.files.create_upload_session(f, size_chunk,
                                                               print_upload_progress).execute_query()
+
 
     #uploaded_file = target_folder.files.create_upload_session(local_path, size_chunk, print_upload_progress).execute_query()
     print('File {0} has been uploaded successfully'.format(uploaded_file.serverRelativeUrl))
